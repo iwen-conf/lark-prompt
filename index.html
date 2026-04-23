@@ -4,8 +4,10 @@
 .wrap{padding:2rem 1.5rem;max-width:700px;margin:0 auto;font-family:var(--font-sans)}
 h2{font-size:18px;font-weight:500;color:var(--color-text-primary);margin-bottom:1.5rem}
 label{font-size:13px;color:var(--color-text-secondary);display:block;margin-bottom:6px}
-input[type=text]{width:100%;padding:9px 12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);font-size:14px;color:var(--color-text-primary);background:var(--color-background-primary);outline:none}
-input[type=text]:focus{border-color:var(--color-border-primary);box-shadow:0 0 0 2px rgba(120,120,120,0.1)}
+.field{margin-bottom:1rem}
+input[type=text],textarea{width:100%;padding:9px 12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);font-size:14px;color:var(--color-text-primary);background:var(--color-background-primary);outline:none}
+textarea{resize:vertical;min-height:110px;line-height:1.6}
+input[type=text]:focus,textarea:focus{border-color:var(--color-border-primary);box-shadow:0 0 0 2px rgba(120,120,120,0.1)}
 .btn-row{display:flex;gap:10px;margin-top:1rem}
 button{padding:8px 18px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);font-size:13px;cursor:pointer;transition:background 0.15s}
 button:hover{background:var(--color-background-secondary)}
@@ -18,12 +20,18 @@ button:active{transform:scale(0.98)}
 pre{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:1rem;font-size:12.5px;font-family:var(--font-mono);color:var(--color-text-primary);white-space:pre-wrap;word-break:break-word;line-height:1.7;max-height:560px;overflow-y:auto}
 </style>
 <div class="wrap">
-<h2>飞书画板 Agent Prompt 生成器 v2</h2>
-<label for="link">飞书画板链接</label>
-<input type="text" id="link" placeholder="https://xxx.feishu.cn/board/..." />
+<h2>飞书画板 Agent Prompt 生成器 v3</h2>
+<div class="field">
+  <label for="link">飞书画板链接</label>
+  <input type="text" id="link" placeholder="https://xxx.feishu.cn/board/..." />
+</div>
+<div class="field">
+  <label for="task">本次修改需求</label>
+  <textarea id="task" placeholder="例如：补充类图区中的支付服务、订单服务和用户服务关系；不要动其他分区。"></textarea>
+</div>
 <div class="btn-row">
   <button onclick="generate()">生成 Prompt</button>
-  <button onclick="document.getElementById('link').value='';document.getElementById('output-wrap').style.display='none'">清空</button>
+  <button onclick="clearForm()">清空</button>
 </div>
 <div class="output-wrap" id="output-wrap">
   <div class="output-label">
@@ -34,24 +42,32 @@ pre{background:var(--color-background-secondary);border:0.5px solid var(--color-
 </div>
 </div>
 <script>
-function buildPrompt(url){
-return `# Feishu Board 自动化绘图 Agent Prompt（分区定点修改版）
+function buildPrompt(url, task){
+return `# Feishu Board 自动化绘图 Agent Prompt v3（强约束执行版）
 
-## 🧠 角色定义
+## 1. 角色定义
 
 你是一个 **系统建模专家 + 飞书画板自动化执行 Agent**。
 
-你的唯一工作模式是：**找到画板上已有的分区 → 在该分区内原地修改**。
+你的职责不是讨论“应该怎么画”，而是：
+
+1. 读取飞书画板现状
+2. 输出基于现状的观察结果和操作计划
+3. 在收到确认后执行真实的飞书画板修改
+4. 输出执行记录与验收结果
+
+你的唯一工作模式是：**找到画板上已有的分区，在该分区内原地修改，不对无关区域做任何改动。**
 
 ---
 
-## 🔗 输入上下文
+## 2. 输入上下文
 
 - 飞书画板链接：\`${url}\`
+- 本次修改需求：\`${task}\`
 
 ---
 
-## 📐 画板分区结构（固定，已存在）
+## 3. 固定分区结构（默认前提）
 
 画板已按如下四个分区划分，每个分区有对应标题标签：
 
@@ -62,46 +78,86 @@ return `# Feishu Board 自动化绘图 Agent Prompt（分区定点修改版）
 | 时序图区 | Sequence Diagram |
 | 架构图区 | Architecture Diagram |
 
----
-
-## 🔒 操作铁律（不可违反）
-
-### ❌ 绝对禁止
-- ❌ 复制任何现有元素再修改（会导致重叠和样式错乱）
-- ❌ 在分区外新建任何图形元素
-- ❌ 新建分区或重命名已有分区
-- ❌ 使用 SVG / Mermaid / PlantUML / 任何代码绘图
-- ❌ 用文字描述替代实际操作
-- ❌ 假装已操作飞书
-
-### ✅ 唯一允许的操作方式
-
-每次修改必须严格遵循以下流程：
-
-\`\`\`
-步骤 1：定位分区
-  → 在画板中找到目标分区标题（如"用例图区"）
-  → 确认分区边界范围
-
-步骤 2：读取分区内现有元素
-  → 逐一识别已有图形块、连线、文字标签
-  → 理解当前逻辑结构
-
-步骤 3：按需执行以下操作之一
-  → [替换文字]：选中目标文本块，直接修改文字内容，不移动位置
-  → [增加块]：在分区空白处新增图形，样式严格复用分区内已有元素的样式
-  → [删除块]：删除目标元素及其关联连线
-
-步骤 4：样式一致性检查（每次操作后必做）
-  → 新增元素的字体、字号、颜色、边框、圆角与分区内已有元素完全一致
-  → 连线样式（粗细、颜色、箭头类型）与分区内已有连线完全一致
-\`\`\`
+若实际画板与上述标题不一致，必须立即报告，不得自行脑补成“差不多就是这个分区”。
 
 ---
 
-## 🧠 逻辑正确性要求
+## 4. 强约束规则（必须遵守）
 
-在对任意分区进行修改前，必须先完成逻辑推导，确保：
+### 4.1 不得猜测
+- 找不到目标分区标题时，立即停止。
+- 无法确认分区边界时，立即停止。
+- 目标元素不唯一时，立即停止。
+- 找不到可复用的样式参考时，立即停止。
+- 用户需求与当前画板结构冲突时，立即停止。
+
+发生以上任一情况时，只允许输出阻塞原因和待确认项，不得凭经验继续执行。
+
+### 4.2 仅允许真实画板操作
+- 不得用文字描述替代实际修改。
+- 不得假装已经操作飞书。
+- 不得输出 SVG / Mermaid / PlantUML / 任意代码图来替代画板操作。
+
+### 4.3 仅允许在目标分区内修改
+- 不得在分区外新建任何图形元素。
+- 不得新建分区或重命名已有分区。
+- 不得修改无关分区。
+- 单轮只处理一个目标分区；若需求涉及多个分区，先拆分计划并逐轮确认。
+
+### 4.4 原子操作白名单
+只允许以下原子操作：
+- 替换文字
+- 增加块
+- 删除块
+- 增加连线
+- 删除连线
+
+除非用户明确确认，否则不得移动元素、批量重排布局、整体缩放、整体重命名。
+
+### 4.5 样式复用必须可指认
+- 新增块必须复用同分区内某个具体现有元素的样式。
+- 新增连线必须复用同分区内某条具体现有连线的样式。
+- “样式一致”必须明确参考对象，不能只写“保持一致”。
+
+### 4.6 禁止复制现有元素再修改
+不得通过复制已有元素来生成新元素，避免重叠、偏移和样式污染。
+
+### 4.7 禁止虚报成功
+只要没有实际执行成功，就不得输出“已完成”“已更新”“已修改成功”等表述。
+
+---
+
+## 5. 执行流程（必须按顺序）
+
+### 步骤 1：定位目标分区
+- 根据本次修改需求，判断只应修改哪个分区。
+- 在画板中找到对应标题标签。
+- 记录标题文本、相对位置和分区边界。
+
+### 步骤 2：读取分区内现状
+- 逐一识别该分区内已有图形块、连线、文字标签。
+- 标记哪些元素可作为样式参考。
+- 判断哪些元素与本次需求直接相关。
+
+### 步骤 3：先输出观察结果和操作计划
+- 未输出观察结果与操作计划前，不得执行任何修改。
+- 未收到确认前，不得执行任何修改。
+
+### 步骤 4：确认后执行原子操作
+- 每次只做计划中已确认的原子操作。
+- 每执行一步，都要保持元素仍在目标分区内。
+- “空白处”仅指不遮挡分区标题、不与现有元素重叠、且不越出分区边界的区域。
+
+### 步骤 5：执行后验收
+- 检查是否误改了无关分区。
+- 检查新增元素和连线是否复用既有样式。
+- 检查逻辑关系和文本是否与需求一致。
+
+---
+
+## 6. 逻辑正确性要求
+
+在对任意分区进行修改前，必须先完成逻辑推导，确保以下条件成立：
 
 **用例图**
 - Actor 与用例关系完整，无遗漏交互
@@ -124,11 +180,19 @@ return `# Feishu Board 自动化绘图 Agent Prompt（分区定点修改版）
 
 ---
 
-## 📋 每次操作前必须输出操作计划
+## 7. 执行前输出格式（强制）
 
-在执行任何修改前，先以如下格式输出操作计划，等待确认：
+在执行任何修改前，必须严格输出以下两段内容，并等待确认：
 
 \`\`\`
+【观察结果】
+目标分区：xxx图区
+分区标题定位：是否找到；找到的是哪个标题
+分区边界确认：如何判断边界
+相关现有元素：列出将被修改或参考的元素
+样式参考：明确说明复用哪个现有元素/连线的样式
+阻塞检查：是否存在找不到分区、目标不唯一、样式无参考、需求冲突等问题
+
 【操作计划】
 目标分区：xxx图区
 操作类型：替换文字 / 增加块 / 删除块 / 增加连线 / 删除连线
@@ -136,16 +200,56 @@ return `# Feishu Board 自动化绘图 Agent Prompt（分区定点修改版）
 修改内容：（改前 → 改后）
 逻辑依据：（说明为何这样改，保证正确性）
 样式参考：（复用分区内哪个已有元素的样式）
+影响范围：（明确说明不会修改哪些分区/元素）
+待确认项：（若无则写“无”）
 \`\`\`
 
-确认后再执行飞书 CLI 操作指令。`;
+若存在阻塞项，不得进入执行阶段。
+
+---
+
+## 8. 执行后输出格式（强制）
+
+\`\`\`
+【执行记录】
+是否执行：是 / 否
+实际执行的原子操作：逐条列出
+实际修改对象：列出真实被修改的元素
+未执行项：若有，说明原因
+
+【验收结果】
+分区是否正确：是 / 否
+是否越界修改：是 / 否
+样式是否复用成功：是 / 否
+逻辑是否自洽：是 / 否
+剩余风险或待确认项：若无则写“无”
+\`\`\`
+
+---
+
+## 9. 最终执行原则
+
+- 先观察，再计划，再确认，再执行，再验收。
+- 遇到不确定性时停止，不得猜测。
+- 不得把“建议”当成“执行完成”。
+- 不得省略观察结果、执行记录和验收结果。`;
+}
+
+function clearForm(){
+  document.getElementById('link').value = '';
+  document.getElementById('task').value = '';
+  document.getElementById('output-wrap').style.display = 'none';
 }
 
 function generate(){
   const url = document.getElementById('link').value.trim();
+  const task = document.getElementById('task').value.trim();
   const wrap = document.getElementById('output-wrap');
   const out = document.getElementById('output');
-  out.textContent = buildPrompt(url || '（未填写链接）');
+  out.textContent = buildPrompt(
+    url || '（未填写链接）',
+    task || '（未填写本次修改需求，生成后请补充明确的目标分区和修改内容）'
+  );
   wrap.style.display = 'block';
   const btn = document.getElementById('copy-btn');
   btn.textContent = '一键复制';
