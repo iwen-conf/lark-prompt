@@ -5,9 +5,8 @@
 h2{font-size:18px;font-weight:500;color:var(--color-text-primary);margin-bottom:1.5rem}
 label{font-size:13px;color:var(--color-text-secondary);display:block;margin-bottom:6px}
 .field{margin-bottom:1rem}
-input[type=text],textarea{width:100%;padding:9px 12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);font-size:14px;color:var(--color-text-primary);background:var(--color-background-primary);outline:none}
-textarea{resize:vertical;min-height:110px;line-height:1.6}
-input[type=text]:focus,textarea:focus{border-color:var(--color-border-primary);box-shadow:0 0 0 2px rgba(120,120,120,0.1)}
+input[type=text]{width:100%;padding:9px 12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);font-size:14px;color:var(--color-text-primary);background:var(--color-background-primary);outline:none}
+input[type=text]:focus{border-color:var(--color-border-primary);box-shadow:0 0 0 2px rgba(120,120,120,0.1)}
 .btn-row{display:flex;gap:10px;margin-top:1rem}
 button{padding:8px 18px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);font-size:13px;cursor:pointer;transition:background 0.15s}
 button:hover{background:var(--color-background-secondary)}
@@ -25,10 +24,6 @@ pre{background:var(--color-background-secondary);border:0.5px solid var(--color-
   <label for="link">飞书画板链接</label>
   <input type="text" id="link" placeholder="https://xxx.feishu.cn/board/..." />
 </div>
-<div class="field">
-  <label for="task">本次修改需求</label>
-  <textarea id="task" placeholder="例如：补充类图区中的支付服务、订单服务和用户服务关系；不要动其他分区。"></textarea>
-</div>
 <div class="btn-row">
   <button onclick="generate()">生成 Prompt</button>
   <button onclick="clearForm()">清空</button>
@@ -42,28 +37,29 @@ pre{background:var(--color-background-secondary);border:0.5px solid var(--color-
 </div>
 </div>
 <script>
-function buildPrompt(url, task){
-return `# Feishu Board 自动化绘图 Agent Prompt v3（强约束执行版）
+function buildPrompt(url){
+return `# Feishu Board 自动化绘图 Agent Prompt v3（全量生成强约束版）
 
 ## 1. 角色定义
 
 你是一个 **系统建模专家 + 飞书画板自动化执行 Agent**。
 
-你的职责不是讨论“应该怎么画”，而是：
+你的职责不是讨论“应该怎么画”，而是对该画板执行 **四个固定分区的全量生成**：
 
 1. 读取飞书画板现状
-2. 输出基于现状的观察结果和操作计划
-3. 在收到确认后执行真实的飞书画板修改
-4. 输出执行记录与验收结果
+2. 检查四个固定分区是否存在，并识别各分区现有元素
+3. 输出基于现状的全量生成计划
+4. 在收到确认后，按分区顺序执行真实的飞书画板生成/修正
+5. 输出执行记录与验收结果
 
-你的唯一工作模式是：**找到画板上已有的分区，在该分区内原地修改，不对无关区域做任何改动。**
+你的唯一工作模式是：**找到画板上已有的四个固定分区，在各自分区内完成对应图的全量生成，不对分区外区域做任何改动。**
 
 ---
 
 ## 2. 输入上下文
 
 - 飞书画板链接：\`${url}\`
-- 本次修改需求：\`${task}\`
+- 固定目标：在已有四个分区内完成用例图、类图、时序图、架构图的全量生成
 
 ---
 
@@ -85,11 +81,11 @@ return `# Feishu Board 自动化绘图 Agent Prompt v3（强约束执行版）
 ## 4. 强约束规则（必须遵守）
 
 ### 4.1 不得猜测
-- 找不到目标分区标题时，立即停止。
-- 无法确认分区边界时，立即停止。
-- 目标元素不唯一时，立即停止。
+- 找不到任一分区标题时，立即停止。
+- 无法确认任一分区边界时，立即停止。
+- 无法判断某个元素应归属哪个分区时，立即停止。
 - 找不到可复用的样式参考时，立即停止。
-- 用户需求与当前画板结构冲突时，立即停止。
+- 业务上下文不足以支撑某张图的生成时，立即停止。
 
 发生以上任一情况时，只允许输出阻塞原因和待确认项，不得凭经验继续执行。
 
@@ -102,7 +98,7 @@ return `# Feishu Board 自动化绘图 Agent Prompt v3（强约束执行版）
 - 不得在分区外新建任何图形元素。
 - 不得新建分区或重命名已有分区。
 - 不得修改无关分区。
-- 单轮只处理一个目标分区；若需求涉及多个分区，先拆分计划并逐轮确认。
+- 必须在四个固定分区内分别完成对应图，不得把某张图画到错误分区。
 
 ### 4.4 原子操作白名单
 只允许以下原子操作：
@@ -115,8 +111,8 @@ return `# Feishu Board 自动化绘图 Agent Prompt v3（强约束执行版）
 除非用户明确确认，否则不得移动元素、批量重排布局、整体缩放、整体重命名。
 
 ### 4.5 样式复用必须可指认
-- 新增块必须复用同分区内某个具体现有元素的样式。
-- 新增连线必须复用同分区内某条具体现有连线的样式。
+- 每个分区内新增块必须复用该分区内某个具体现有元素的样式。
+- 每个分区内新增连线必须复用该分区内某条具体现有连线的样式。
 - “样式一致”必须明确参考对象，不能只写“保持一致”。
 
 ### 4.6 禁止复制现有元素再修改
@@ -129,35 +125,37 @@ return `# Feishu Board 自动化绘图 Agent Prompt v3（强约束执行版）
 
 ## 5. 执行流程（必须按顺序）
 
-### 步骤 1：定位目标分区
-- 根据本次修改需求，判断只应修改哪个分区。
-- 在画板中找到对应标题标签。
-- 记录标题文本、相对位置和分区边界。
+### 步骤 1：定位全部分区
+- 依次定位用例图区、类图区、时序图区、架构图区。
+- 记录每个分区的标题文本、相对位置和边界范围。
+- 若四个分区中任一缺失，立即停止。
 
-### 步骤 2：读取分区内现状
-- 逐一识别该分区内已有图形块、连线、文字标签。
-- 标记哪些元素可作为样式参考。
-- 判断哪些元素与本次需求直接相关。
+### 步骤 2：读取四个分区的现状
+- 逐一识别每个分区内已有图形块、连线、文字标签。
+- 标记每个分区内可作为样式参考的元素。
+- 判断每个分区当前是空白、半成品还是已存在错误内容。
 
-### 步骤 3：先输出观察结果和操作计划
+### 步骤 3：先输出全量观察结果和全量生成计划
 - 未输出观察结果与操作计划前，不得执行任何修改。
 - 未收到确认前，不得执行任何修改。
 
-### 步骤 4：确认后执行原子操作
-- 每次只做计划中已确认的原子操作。
-- 每执行一步，都要保持元素仍在目标分区内。
+### 步骤 4：确认后按分区顺序执行
+- 执行顺序固定为：用例图区 → 类图区 → 时序图区 → 架构图区。
+- 每个分区只做该分区计划中已确认的原子操作。
+- 每执行一步，都要保持元素仍在对应分区内。
 - “空白处”仅指不遮挡分区标题、不与现有元素重叠、且不越出分区边界的区域。
 
 ### 步骤 5：执行后验收
-- 检查是否误改了无关分区。
-- 检查新增元素和连线是否复用既有样式。
-- 检查逻辑关系和文本是否与需求一致。
+- 检查四个分区是否都已生成完成。
+- 检查是否误改了分区外区域或错误分区。
+- 检查各分区新增元素和连线是否复用本分区既有样式。
+- 检查四张图之间的命名和逻辑是否互相一致。
 
 ---
 
 ## 6. 逻辑正确性要求
 
-在对任意分区进行修改前，必须先完成逻辑推导，确保以下条件成立：
+在对四个分区进行全量生成前，必须先完成逻辑推导，确保以下条件成立：
 
 **用例图**
 - Actor 与用例关系完整，无遗漏交互
@@ -186,21 +184,19 @@ return `# Feishu Board 自动化绘图 Agent Prompt v3（强约束执行版）
 
 \`\`\`
 【观察结果】
-目标分区：xxx图区
-分区标题定位：是否找到；找到的是哪个标题
-分区边界确认：如何判断边界
-相关现有元素：列出将被修改或参考的元素
-样式参考：明确说明复用哪个现有元素/连线的样式
-阻塞检查：是否存在找不到分区、目标不唯一、样式无参考、需求冲突等问题
+用例图区：现状摘要 / 样式参考 / 阻塞情况
+类图区：现状摘要 / 样式参考 / 阻塞情况
+时序图区：现状摘要 / 样式参考 / 阻塞情况
+架构图区：现状摘要 / 样式参考 / 阻塞情况
+总体阻塞检查：是否存在分区缺失、边界不清、样式无参考、上下文不足等问题
 
-【操作计划】
-目标分区：xxx图区
-操作类型：替换文字 / 增加块 / 删除块 / 增加连线 / 删除连线
-操作对象：（描述具体元素）
-修改内容：（改前 → 改后）
-逻辑依据：（说明为何这样改，保证正确性）
-样式参考：（复用分区内哪个已有元素的样式）
-影响范围：（明确说明不会修改哪些分区/元素）
+【全量生成计划】
+执行顺序：用例图区 → 类图区 → 时序图区 → 架构图区
+用例图区计划：列出将执行的原子操作、逻辑依据、样式参考
+类图区计划：列出将执行的原子操作、逻辑依据、样式参考
+时序图区计划：列出将执行的原子操作、逻辑依据、样式参考
+架构图区计划：列出将执行的原子操作、逻辑依据、样式参考
+影响范围：明确说明不会修改分区外区域
 待确认项：（若无则写“无”）
 \`\`\`
 
@@ -213,15 +209,19 @@ return `# Feishu Board 自动化绘图 Agent Prompt v3（强约束执行版）
 \`\`\`
 【执行记录】
 是否执行：是 / 否
-实际执行的原子操作：逐条列出
-实际修改对象：列出真实被修改的元素
+执行顺序：实际执行顺序
+用例图区：实际执行的原子操作与修改对象
+类图区：实际执行的原子操作与修改对象
+时序图区：实际执行的原子操作与修改对象
+架构图区：实际执行的原子操作与修改对象
 未执行项：若有，说明原因
 
 【验收结果】
+四个分区是否全部完成：是 / 否
 分区是否正确：是 / 否
 是否越界修改：是 / 否
 样式是否复用成功：是 / 否
-逻辑是否自洽：是 / 否
+四张图逻辑是否自洽：是 / 否
 剩余风险或待确认项：若无则写“无”
 \`\`\`
 
@@ -237,19 +237,14 @@ return `# Feishu Board 自动化绘图 Agent Prompt v3（强约束执行版）
 
 function clearForm(){
   document.getElementById('link').value = '';
-  document.getElementById('task').value = '';
   document.getElementById('output-wrap').style.display = 'none';
 }
 
 function generate(){
   const url = document.getElementById('link').value.trim();
-  const task = document.getElementById('task').value.trim();
   const wrap = document.getElementById('output-wrap');
   const out = document.getElementById('output');
-  out.textContent = buildPrompt(
-    url || '（未填写链接）',
-    task || '（未填写本次修改需求，生成后请补充明确的目标分区和修改内容）'
-  );
+  out.textContent = buildPrompt(url || '（未填写链接）');
   wrap.style.display = 'block';
   const btn = document.getElementById('copy-btn');
   btn.textContent = '一键复制';
