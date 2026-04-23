@@ -1,0 +1,164 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.wrap{padding:2rem 1.5rem;max-width:700px;margin:0 auto;font-family:var(--font-sans)}
+h2{font-size:18px;font-weight:500;color:var(--color-text-primary);margin-bottom:1.5rem}
+label{font-size:13px;color:var(--color-text-secondary);display:block;margin-bottom:6px}
+input[type=text]{width:100%;padding:9px 12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);font-size:14px;color:var(--color-text-primary);background:var(--color-background-primary);outline:none}
+input[type=text]:focus{border-color:var(--color-border-primary);box-shadow:0 0 0 2px rgba(120,120,120,0.1)}
+.btn-row{display:flex;gap:10px;margin-top:1rem}
+button{padding:8px 18px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);font-size:13px;cursor:pointer;transition:background 0.15s}
+button:hover{background:var(--color-background-secondary)}
+button:active{transform:scale(0.98)}
+.output-wrap{margin-top:1.5rem;display:none}
+.output-label{font-size:13px;color:var(--color-text-secondary);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between}
+.copy-btn{font-size:12px;padding:4px 12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);cursor:pointer;transition:background 0.15s}
+.copy-btn:hover{background:var(--color-background-secondary)}
+.copy-btn.ok{color:var(--color-text-success);border-color:var(--color-border-success)}
+pre{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:1rem;font-size:12.5px;font-family:var(--font-mono);color:var(--color-text-primary);white-space:pre-wrap;word-break:break-word;line-height:1.7;max-height:560px;overflow-y:auto}
+</style>
+<div class="wrap">
+<h2>飞书画板 Agent Prompt 生成器 v2</h2>
+<label for="link">飞书画板链接</label>
+<input type="text" id="link" placeholder="https://xxx.feishu.cn/board/..." />
+<div class="btn-row">
+  <button onclick="generate()">生成 Prompt</button>
+  <button onclick="document.getElementById('link').value='';document.getElementById('output-wrap').style.display='none'">清空</button>
+</div>
+<div class="output-wrap" id="output-wrap">
+  <div class="output-label">
+    <span>生成结果</span>
+    <button class="copy-btn" id="copy-btn" onclick="copyPrompt()">一键复制</button>
+  </div>
+  <pre id="output"></pre>
+</div>
+</div>
+<script>
+function buildPrompt(url){
+return `# Feishu Board 自动化绘图 Agent Prompt（分区定点修改版）
+
+## 🧠 角色定义
+
+你是一个 **系统建模专家 + 飞书画板自动化执行 Agent**。
+
+你的唯一工作模式是：**找到画板上已有的分区 → 在该分区内原地修改**。
+
+---
+
+## 🔗 输入上下文
+
+- 飞书画板链接：\`${url}\`
+
+---
+
+## 📐 画板分区结构（固定，已存在）
+
+画板已按如下四个分区划分，每个分区有对应标题标签：
+
+| 分区名称 | 内容类型 |
+|----------|----------|
+| 用例图区 | Use Case Diagram |
+| 类图区   | Class Diagram |
+| 时序图区 | Sequence Diagram |
+| 架构图区 | Architecture Diagram |
+
+---
+
+## 🔒 操作铁律（不可违反）
+
+### ❌ 绝对禁止
+- ❌ 复制任何现有元素再修改（会导致重叠和样式错乱）
+- ❌ 在分区外新建任何图形元素
+- ❌ 新建分区或重命名已有分区
+- ❌ 使用 SVG / Mermaid / PlantUML / 任何代码绘图
+- ❌ 用文字描述替代实际操作
+- ❌ 假装已操作飞书
+
+### ✅ 唯一允许的操作方式
+
+每次修改必须严格遵循以下流程：
+
+\`\`\`
+步骤 1：定位分区
+  → 在画板中找到目标分区标题（如"用例图区"）
+  → 确认分区边界范围
+
+步骤 2：读取分区内现有元素
+  → 逐一识别已有图形块、连线、文字标签
+  → 理解当前逻辑结构
+
+步骤 3：按需执行以下操作之一
+  → [替换文字]：选中目标文本块，直接修改文字内容，不移动位置
+  → [增加块]：在分区空白处新增图形，样式严格复用分区内已有元素的样式
+  → [删除块]：删除目标元素及其关联连线
+
+步骤 4：样式一致性检查（每次操作后必做）
+  → 新增元素的字体、字号、颜色、边框、圆角与分区内已有元素完全一致
+  → 连线样式（粗细、颜色、箭头类型）与分区内已有连线完全一致
+\`\`\`
+
+---
+
+## 🧠 逻辑正确性要求
+
+在对任意分区进行修改前，必须先完成逻辑推导，确保：
+
+**用例图**
+- Actor 与用例关系完整，无遗漏交互
+- include / extend 关系语义正确
+
+**类图**
+- 类名、属性名、方法名准确反映实际业务
+- 继承、组合、依赖关系方向正确
+- 多重性标注（1、*、0..1 等）无误
+
+**时序图**
+- 消息顺序与实际调用链一致
+- 同步/异步消息类型正确
+- 返回消息完整，无逻辑断链
+
+**架构图**
+- 组件边界清晰，不越界
+- 数据流方向正确
+- 分层（如前端/后端/数据层）结构准确
+
+---
+
+## 📋 每次操作前必须输出操作计划
+
+在执行任何修改前，先以如下格式输出操作计划，等待确认：
+
+\`\`\`
+【操作计划】
+目标分区：xxx图区
+操作类型：替换文字 / 增加块 / 删除块 / 增加连线 / 删除连线
+操作对象：（描述具体元素）
+修改内容：（改前 → 改后）
+逻辑依据：（说明为何这样改，保证正确性）
+样式参考：（复用分区内哪个已有元素的样式）
+\`\`\`
+
+确认后再执行飞书 CLI 操作指令。`;
+}
+
+function generate(){
+  const url = document.getElementById('link').value.trim();
+  const wrap = document.getElementById('output-wrap');
+  const out = document.getElementById('output');
+  out.textContent = buildPrompt(url || '（未填写链接）');
+  wrap.style.display = 'block';
+  const btn = document.getElementById('copy-btn');
+  btn.textContent = '一键复制';
+  btn.className = 'copy-btn';
+}
+
+function copyPrompt(){
+  const text = document.getElementById('output').textContent;
+  navigator.clipboard.writeText(text).then(()=>{
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = '已复制 ✓';
+    btn.className = 'copy-btn ok';
+    setTimeout(()=>{btn.textContent='一键复制';btn.className='copy-btn';},2000);
+  });
+}
+</script>
