@@ -238,6 +238,7 @@
       <option value="">请选择模板类型</option>
       <option value="泳道图">泳道图</option>
       <option value="用例图">用例图</option>
+      <option value="类图">类图</option>
       <option value="流程图">流程图</option>
       <option value="时序图">时序图</option>
       <option value="架构图">架构图</option>
@@ -281,6 +282,11 @@ function getTemplateGuidance(templateType){
       '重点校正 actor、use case、include / extend / 泛化等语义关系。',
       '不要混入流程步骤泳道、部署节点层级或网络链路拓扑。'
     ],
+    '类图': [
+      '以类、接口、属性、方法以及它们之间的继承、实现、关联、聚合、组合、依赖关系为核心。',
+      '重点校正领域对象边界、成员可见性、类型归属和类间关系方向与语义。',
+      '不要混入业务流程步骤、时序消息调用或部署架构分层。'
+    ],
     '流程图': [
       '以开始/结束、处理步骤、判断节点和流转箭头为核心。',
       '重点校正主流程、分支条件、回退路径、异常处理和前后顺序。',
@@ -305,7 +311,7 @@ function getTemplateGuidance(templateType){
 
   const guidance = guidanceMap[templateType];
   if (!guidance) {
-    return '- 仅允许选择：泳道图 / 用例图 / 流程图 / 时序图 / 架构图 / 网络拓扑图。\n- 先确认模板类型，再按该类型约束执行。';
+    return '- 仅允许选择：泳道图 / 用例图 / 类图 / 流程图 / 时序图 / 架构图 / 网络拓扑图。\n- 先确认模板类型，再按该类型约束执行。';
   }
 
   return guidance.map((item) => `- ${item}`).join('\n');
@@ -314,7 +320,7 @@ function getTemplateGuidance(templateType){
 function buildPrompt(){
   const boardUrl = escapePromptValue(document.getElementById('board-url').value.trim() || '（请在这里填入 whiteboard URL 或 whiteboard token）');
   const templateTypeValue = document.getElementById('template-type').value.trim();
-  const templateType = escapePromptValue(templateTypeValue || '（请从下拉框选择模板类型：泳道图 / 用例图 / 流程图 / 时序图 / 架构图 / 网络拓扑图）');
+  const templateType = escapePromptValue(templateTypeValue || '（请从下拉框选择模板类型：泳道图 / 用例图 / 类图 / 流程图 / 时序图 / 架构图 / 网络拓扑图）');
   const taskInput = document.getElementById('task').value.trim();
   const task = escapePromptValue(taskInput || '（未填写；请按系统实际情况和所选模板类型，对这个画板做第一次初始化改写）');
   const templateGuidance = getTemplateGuidance(templateTypeValue);
