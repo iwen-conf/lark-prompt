@@ -1,52 +1,255 @@
-
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Feishu Board Prompt Generator</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-.wrap{padding:2rem 1.5rem;max-width:700px;margin:0 auto;font-family:var(--font-sans)}
-h2{font-size:18px;font-weight:500;color:var(--color-text-primary);margin-bottom:1rem}
-p{font-size:13px;line-height:1.7;color:var(--color-text-secondary)}
-.desc{margin-bottom:1rem}
-label{font-size:13px;color:var(--color-text-secondary);display:block;margin-bottom:6px}
-.field{margin-bottom:1rem}
-input[type=text],textarea{width:100%;padding:9px 12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);font-size:14px;color:var(--color-text-primary);background:var(--color-background-primary);outline:none}
-input[type=text]:focus,textarea:focus{border-color:var(--color-border-primary);box-shadow:0 0 0 2px rgba(120,120,120,0.1)}
-textarea{resize:vertical;min-height:120px;font-family:var(--font-sans)}
-.btn-row{display:flex;gap:10px;margin-top:1rem}
-button{padding:8px 18px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);font-size:13px;cursor:pointer;transition:background 0.15s}
-button:hover{background:var(--color-background-secondary)}
-button:active{transform:scale(0.98)}
-.output-wrap{margin-top:1.5rem;display:none}
-.output-label{font-size:13px;color:var(--color-text-secondary);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between}
-.copy-btn{font-size:12px;padding:4px 12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);cursor:pointer;transition:background 0.15s}
-.copy-btn:hover{background:var(--color-background-secondary)}
-.copy-btn.ok{color:var(--color-text-success);border-color:var(--color-border-success)}
-pre{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:1rem;font-size:12.5px;font-family:var(--font-mono);color:var(--color-text-primary);white-space:pre-wrap;word-break:break-word;line-height:1.7;max-height:560px;overflow-y:auto}
+  :root {
+    --primary: #3b82f6;
+    --primary-hover: #2563eb;
+    --bg-page: #f8fafc;
+    --bg-card: #ffffff;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --border-color: #e2e8f0;
+    --border-focus: #93c5fd;
+    --ring-focus: rgba(59, 130, 246, 0.2);
+    --radius: 12px;
+    --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--bg-page);
+    color: var(--text-main);
+    line-height: 1.6;
+    display: flex;
+    justify-content: center;
+    padding: 3rem 1rem;
+    min-height: 100vh;
+  }
+
+  .container {
+    background: var(--bg-card);
+    width: 100%;
+    max-width: 800px;
+    padding: 2.5rem;
+    border-radius: var(--radius);
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+    border: 1px solid var(--border-color);
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--text-main);
+    letter-spacing: -0.025em;
+  }
+
+  .desc {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+  }
+
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+
+  label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: var(--text-main);
+  }
+
+  input[type="text"], textarea {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
+    font-family: var(--font-sans);
+    color: var(--text-main);
+    background-color: #fff;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    transition: all 0.2s ease-in-out;
+    outline: none;
+  }
+
+  input[type="text"]::placeholder, textarea::placeholder {
+    color: #94a3b8;
+  }
+
+  input[type="text"]:focus, textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--ring-focus);
+  }
+
+  textarea {
+    resize: vertical;
+    min-height: 120px;
+  }
+
+  .actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+  }
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+  }
+
+  .btn-primary {
+    background-color: var(--primary);
+    color: white;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  }
+
+  .btn-primary:hover {
+    background-color: var(--primary-hover);
+  }
+
+  .btn-secondary {
+    background-color: white;
+    color: var(--text-main);
+    border-color: var(--border-color);
+  }
+
+  .btn-secondary:hover {
+    background-color: #f1f5f9;
+  }
+
+  button:active {
+    transform: translateY(1px);
+  }
+
+  .output-section {
+    margin-top: 2.5rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border-color);
+    display: none;
+    animation: fadeIn 0.4s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .output-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+
+  .output-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+
+  .btn-copy {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    border-radius: 6px;
+    background-color: var(--bg-page);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+  }
+
+  .btn-copy:hover {
+    background-color: #e2e8f0;
+  }
+
+  .btn-copy.success {
+    background-color: #ecfdf5;
+    border-color: #10b981;
+    color: #047857;
+  }
+
+  pre {
+    background-color: #1e293b;
+    color: #f8fafc;
+    padding: 1.5rem;
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    line-height: 1.6;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 600px;
+    overflow-y: auto;
+    box-shadow: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+  }
+
+  pre::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  pre::-webkit-scrollbar-track {
+    background: #1e293b; 
+    border-radius: 4px;
+  }
+  pre::-webkit-scrollbar-thumb {
+    background: #475569; 
+    border-radius: 4px;
+  }
+  pre::-webkit-scrollbar-thumb:hover {
+    background: #64748b; 
+  }
 </style>
-<div class="wrap">
-<h2>Feishu Board 原生执行 Prompt 生成器</h2>
-<p class="desc">填写飞书画板/文档地址和修改要求，生成一个可直接交给 AI 的执行型 Prompt。AI 会自己解析 token、调用飞书技能，并按飞书原生 whiteboard raw 节点完成查询、修改和写回。</p>
-<div class="field">
-  <label for="board-url">飞书画板 / 文档地址</label>
-  <input id="board-url" type="text" placeholder="粘贴 whiteboard URL、doc URL 或 whiteboard token" />
-</div>
-<div class="field">
-  <label for="task">修改要求</label>
-  <textarea id="task" placeholder="例如：基于现有模板，把支付链路补上风控节点、风控决策连线和失败回流说明，保留原有布局和样式。"></textarea>
-</div>
-<div class="btn-row">
-  <button onclick="generate()">生成 Prompt</button>
-  <button onclick="clearForm()">清空</button>
-</div>
-<div class="output-wrap" id="output-wrap">
-  <div class="output-label">
-    <span>生成结果</span>
-    <button class="copy-btn" id="copy-btn" onclick="copyPrompt()">一键复制</button>
+</head>
+<body>
+
+<div class="container">
+  <h2>Feishu Board 原生执行 Prompt 生成器</h2>
+  <p class="desc">填写飞书画板/文档地址和修改要求，生成一个可直接交给 AI 的执行型 Prompt。AI 会自己解析 token、调用飞书技能，并按飞书原生 whiteboard raw 节点完成查询、修改和写回。</p>
+  
+  <div class="form-group">
+    <label for="board-url">飞书画板 / 文档地址</label>
+    <input id="board-url" type="text" placeholder="粘贴 whiteboard URL、doc URL 或 whiteboard token" />
   </div>
-  <pre id="output"></pre>
+  
+  <div class="form-group">
+    <label for="task">修改要求</label>
+    <textarea id="task" placeholder="例如：基于现有模板，把支付链路补上风控节点、风控决策连线和失败回流说明，保留原有布局和样式。"></textarea>
+  </div>
+  
+  <div class="actions">
+    <button class="btn-primary" onclick="generate()">生成 Prompt</button>
+    <button class="btn-secondary" onclick="clearForm()">清空</button>
+  </div>
+  
+  <div class="output-section" id="output-section">
+    <div class="output-header">
+      <span class="output-title">生成结果</span>
+      <button class="btn-copy" id="btn-copy" onclick="copyPrompt()">一键复制</button>
+    </div>
+    <pre id="output"></pre>
+  </div>
 </div>
-</div>
+
 <script>
 function escapePromptValue(value){
-  return value.replaceAll('\\','\\\\').replaceAll('`','\\`').replaceAll('${','\\${');
+  return value.replaceAll('\\\\', '\\\\\\\\').replaceAll('`', '\\\\`').replaceAll('${', '\\\\${');
 }
 
 function buildPrompt(){
@@ -112,7 +315,7 @@ lark-cli docs +create --help
 1. 如果用户给的是 whiteboard URL 或 whiteboard token：直接把它当作白板目标
 2. 如果用户给的是 doc URL 或 doc token：
    - 先用 \`lark-cli docs +fetch --doc "<doc_url_or_token>" --as user --format pretty\`
-   - 从返回内容中提取 \`<whiteboard token="..."/>\`
+   - 从返回内容中提取 \`<whiteboard token="..." />\`
 3. 如果文档里没有白板但用户要求新建：
    - 先 dry-run：\`lark-cli docs +update --doc "<doc_url_or_token>" --mode append --markdown '<whiteboard type="blank"></whiteboard>' --as user --dry-run\`
    - 再执行同一条去掉 \`--dry-run\` 的命令插入空白白板
@@ -330,39 +533,39 @@ lark-cli docs +fetch --doc "<doc_url_or_token>" --as user --format pretty
 ### 2. 读取白板 raw
 
 \`\`\`bash
-lark-cli whiteboard +query \
-  --whiteboard-token "<token>" \
-  --output_as raw \
+lark-cli whiteboard +query \\
+  --whiteboard-token "<token>" \\
+  --output_as raw \\
   --output ./board.raw.json
 \`\`\`
 
 ### 3. 下载白板预览图
 
 \`\`\`bash
-lark-cli whiteboard +query \
-  --whiteboard-token "<token>" \
-  --output_as image \
+lark-cli whiteboard +query \\
+  --whiteboard-token "<token>" \\
+  --output_as image \\
   --output ./preview.png
 \`\`\`
 
 ### 4. 基于 raw 写回白板
 
 \`\`\`bash
-cat ./board.raw.json | lark-cli whiteboard +update \
-  --whiteboard-token "<token>" \
-  --input_format raw \
-  --source - \
+cat ./board.raw.json | lark-cli whiteboard +update \\
+  --whiteboard-token "<token>" \\
+  --input_format raw \\
+  --source - \\
   --as user
 \`\`\`
 
 ### 5. overwrite 前必须 dry-run
 
 \`\`\`bash
-cat ./board.raw.json | lark-cli whiteboard +update \
-  --whiteboard-token "<token>" \
-  --input_format raw \
-  --source - \
-  --idempotent-token "<10+ chars>" \
+cat ./board.raw.json | lark-cli whiteboard +update \\
+  --whiteboard-token "<token>" \\
+  --input_format raw \\
+  --source - \\
+  --idempotent-token "<10+ chars>" \\
   --overwrite --dry-run --as user
 \`\`\`
 
@@ -391,26 +594,31 @@ function clearForm(){
   document.getElementById('board-url').value = '';
   document.getElementById('task').value = '';
   document.getElementById('output').textContent = '';
-  document.getElementById('output-wrap').style.display = 'none';
+  document.getElementById('output-section').style.display = 'none';
 }
 
 function generate(){
-  const wrap = document.getElementById('output-wrap');
+  const wrap = document.getElementById('output-section');
   const out = document.getElementById('output');
   out.textContent = buildPrompt();
   wrap.style.display = 'block';
-  const btn = document.getElementById('copy-btn');
+  const btn = document.getElementById('btn-copy');
   btn.textContent = '一键复制';
-  btn.className = 'copy-btn';
+  btn.className = 'btn-copy';
 }
 
 function copyPrompt(){
   const text = document.getElementById('output').textContent;
   navigator.clipboard.writeText(text).then(()=>{
-    const btn = document.getElementById('copy-btn');
+    const btn = document.getElementById('btn-copy');
     btn.textContent = '已复制 ✓';
-    btn.className = 'copy-btn ok';
-    setTimeout(()=>{btn.textContent='一键复制';btn.className='copy-btn';},2000);
+    btn.className = 'btn-copy success';
+    setTimeout(()=>{
+      btn.textContent = '一键复制';
+      btn.className = 'btn-copy';
+    }, 2000);
   });
 }
 </script>
+</body>
+</html>
