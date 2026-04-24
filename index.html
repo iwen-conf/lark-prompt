@@ -100,6 +100,40 @@
     min-height: 120px;
   }
 
+  .radio-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .radio-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background-color: #fff;
+    color: var(--text-main);
+    cursor: pointer;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  }
+
+  .radio-option:hover {
+    border-color: var(--border-focus);
+    background-color: #f8fbff;
+  }
+
+  .radio-option:has(input:checked) {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--ring-focus);
+    background-color: #eff6ff;
+  }
+
+  .radio-option input[type="radio"] {
+    accent-color: var(--primary);
+  }
+
   .actions {
     display: flex;
     gap: 1rem;
@@ -225,7 +259,7 @@
 
 <div class="container">
   <h2>Feishu Board 原生执行 Prompt 生成器</h2>
-  <p class="desc">填写画板链接、模板类型和本次改动，生成一个可直接交给 AI 的执行型 Prompt。每次只处理一个画板，且一个画板只允许一种图。</p>
+  <p class="desc">填写画板链接、模板类型、图面语言和本次改动，生成一个可直接交给 AI 的执行型 Prompt。每次只处理一个画板，且一个画板只允许一种图。</p>
   
   <div class="form-group">
     <label for="board-url">画板链接</label>
@@ -244,6 +278,20 @@
       <option value="架构图">架构图</option>
       <option value="网络拓扑图">网络拓扑图</option>
     </select>
+  </div>
+
+  <div class="form-group">
+    <label>图面语言</label>
+    <div class="radio-group" role="radiogroup" aria-label="图面语言">
+      <label class="radio-option" for="language-zh">
+        <input id="language-zh" type="radio" name="diagram-language" value="zh-CN" checked />
+        <span>中文</span>
+      </label>
+      <label class="radio-option" for="language-en">
+        <input id="language-en" type="radio" name="diagram-language" value="en-US" />
+        <span>English</span>
+      </label>
+    </div>
   </div>
   
   <div class="form-group">
@@ -317,13 +365,47 @@ function getTemplateGuidance(templateType){
   return guidance.map((item) => `- ${item}`).join('\n');
 }
 
+function getDiagramLanguage(){
+  return document.querySelector('input[name="diagram-language"]:checked')?.value || 'zh-CN';
+}
+
+function getLanguageConfig(language){
+  const configMap = {
+    'zh-CN': {
+      label: '中文',
+      guidance: [
+        '图中所有对人可见的文字都必须使用中文，包括标题、分组名、节点名、注释、图例、连线标签和状态说明。',
+        '判断节点和分支标签必须写成中文自然表达，优先使用“是/否”“通过/不通过”“成功/失败”“已完成/未完成”等，不要保留 yes/no、true/false、if/else。',
+        '不要把 Mermaid、PlantUML、UML 关键字、代码片段、JSON 字段名、函数名、数据库字段名直接贴到图里；要改写成非技术人员能理解的中文业务表述。',
+        '只有产品名、协议名、接口名、标准缩写等确属专业术语时才允许保留原文；周边解释性文字仍然必须使用中文。',
+        '如果现有画板中存在需要保留但语言不一致的可见文案，在本次修改涉及到该区域时，一并翻译为中文。'
+      ]
+    },
+    'en-US': {
+      label: '英文',
+      guidance: [
+        '图中所有对人可见的文字都必须使用英文，包括标题、分组名、节点名、注释、图例、连线标签和状态说明。',
+        '判断节点和分支标签必须写成英文自然表达，优先使用 “Yes/No”“Approved/Rejected”“Success/Failure”“Done/Pending” 等，不要混入中文。',
+        '不要把 Mermaid、PlantUML、UML 关键字、代码片段、JSON 字段名、函数名、数据库字段名直接贴到图里；要改写成非技术人员能理解的英文业务表述。',
+        'API、HTTP、OAuth、Kafka、SKU 等专业术语可以保留原文，但解释性文字仍然必须使用英文。',
+        '如果现有画板中存在需要保留但语言不一致的可见文案，在本次修改涉及到该区域时，一并翻译为英文。'
+      ]
+    }
+  };
+
+  return configMap[language] || configMap['zh-CN'];
+}
+
 function buildPrompt(){
   const boardUrl = escapePromptValue(document.getElementById('board-url').value.trim() || '（请在这里填入 whiteboard URL 或 whiteboard token）');
   const templateTypeValue = document.getElementById('template-type').value.trim();
   const templateType = escapePromptValue(templateTypeValue || '（请从下拉框选择模板类型：泳道图 / 用例图 / 类图 / 流程图 / 时序图 / 架构图 / 网络拓扑图）');
   const taskInput = document.getElementById('task').value.trim();
   const task = escapePromptValue(taskInput || '（未填写；请按系统实际情况和所选模板类型，对这个画板做第一次初始化改写）');
+  const languageConfig = getLanguageConfig(getDiagramLanguage());
+  const diagramLanguage = escapePromptValue(languageConfig.label);
   const templateGuidance = getTemplateGuidance(templateTypeValue);
+  const languageGuidance = languageConfig.guidance.map((item) => `- ${item}`).join('\n');
 
   return `# Feishu Whiteboard 原生操作 Agent
 
@@ -331,6 +413,7 @@ function buildPrompt(){
 
 - 画板链接：${boardUrl}
 - 模板类型：${templateType}
+- 图面语言：${diagramLanguage}
 - 本次改动：${task}
 
 ## 角色定义
@@ -367,6 +450,15 @@ function buildPrompt(){
 - 在同一张画板里并排做两种以上图型
 - 用几何线条、坐标端点或“贴边对齐”的方式伪造业务连线
 - 让线段只是视觉上碰到节点边缘，但在结构上没有绑定到节点 id
+
+## 图面语言要求
+
+当前图面语言：**${diagramLanguage}**
+
+${languageGuidance}
+
+- 图里最终呈现给业务方、管理层或非技术读者看的内容，必须优先使用自然语言，不要写成英文 + 代码、术语堆砌或配置项拼接的形式。
+- 如果必须引用代码实体、字段名、接口名或事件名，优先把它们放进解释性文案中，而不是直接把原始标识符当作节点主标题。
 
 ## 模板类型约束
 
@@ -644,6 +736,8 @@ cat ./board.raw.json | lark-cli whiteboard +update \\
 function clearForm(){
   document.getElementById('board-url').value = '';
   document.getElementById('template-type').value = '';
+  document.getElementById('language-zh').checked = true;
+  document.getElementById('language-en').checked = false;
   document.getElementById('task').value = '';
   document.getElementById('output').textContent = '';
   document.getElementById('output-section').style.display = 'none';
