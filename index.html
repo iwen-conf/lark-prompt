@@ -69,7 +69,7 @@
     color: var(--text-main);
   }
 
-  input[type="text"], textarea {
+  input[type="text"], select, textarea {
     width: 100%;
     padding: 0.75rem 1rem;
     font-size: 0.95rem;
@@ -86,9 +86,13 @@
     color: #94a3b8;
   }
 
-  input[type="text"]:focus, textarea:focus {
+  input[type="text"]:focus, select:focus, textarea:focus {
     border-color: var(--primary);
     box-shadow: 0 0 0 3px var(--ring-focus);
+  }
+
+  select {
+    appearance: none;
   }
 
   textarea {
@@ -221,16 +225,28 @@
 
 <div class="container">
   <h2>Feishu Board 原生执行 Prompt 生成器</h2>
-  <p class="desc">填写飞书画板/文档地址和修改要求，生成一个可直接交给 AI 的执行型 Prompt。AI 会自己解析 token、调用飞书技能，并按飞书原生 whiteboard raw 节点完成查询、修改和写回。</p>
+  <p class="desc">填写画板链接、模板类型和本次改动，生成一个可直接交给 AI 的执行型 Prompt。每次只处理一个画板，且一个画板只允许一种图。</p>
   
   <div class="form-group">
-    <label for="board-url">飞书画板 / 文档地址</label>
-    <input id="board-url" type="text" placeholder="粘贴 whiteboard URL、doc URL 或 whiteboard token" />
+    <label for="board-url">画板链接</label>
+    <input id="board-url" type="text" placeholder="粘贴 whiteboard URL 或 whiteboard token" />
+  </div>
+
+  <div class="form-group">
+    <label for="template-type">模板类型</label>
+    <select id="template-type">
+      <option value="">请选择模板类型</option>
+      <option value="泳道图">泳道图</option>
+      <option value="用例图">用例图</option>
+      <option value="流程图">流程图</option>
+      <option value="架构图">架构图</option>
+      <option value="网络拓扑图">网络拓扑图</option>
+    </select>
   </div>
   
   <div class="form-group">
-    <label for="task">修改要求</label>
-    <textarea id="task" placeholder="例如：基于现有模板，把支付链路补上风控节点、风控决策连线和失败回流说明，保留原有布局和样式。"></textarea>
+    <label for="task">本次改动</label>
+    <textarea id="task" placeholder="例如：补上风控节点、风控决策连线和失败回流说明。若留空，则按系统实际情况和所选模板类型做第一次初始化改写。"></textarea>
   </div>
   
   <div class="actions">
@@ -252,118 +268,128 @@ function escapePromptValue(value){
   return value.replaceAll('\\\\', '\\\\\\\\').replaceAll('`', '\\\\`').replaceAll('${', '\\\\${');
 }
 
+function getTemplateGuidance(templateType){
+  const guidanceMap = {
+    '泳道图': [
+      '按角色、团队、系统或阶段组织泳道，节点表达动作、决策和跨泳道协作。',
+      '重点校正责任归属、阶段顺序、跨泳道连线方向和异常回流。',
+      '不要混入用例椭圆、网络拓扑设备图例或纯部署架构分层。'
+    ],
+    '用例图': [
+      '以参与者、系统边界、用例和关系为核心，清晰表达谁使用什么能力。',
+      '重点校正 actor、use case、include / extend / 泛化等语义关系。',
+      '不要混入流程步骤泳道、部署节点层级或网络链路拓扑。'
+    ],
+    '流程图': [
+      '以开始/结束、处理步骤、判断节点和流转箭头为核心。',
+      '重点校正主流程、分支条件、回退路径、异常处理和前后顺序。',
+      '不要混入泳道责任分区、用例边界或网络设备拓扑。'
+    ],
+    '架构图': [
+      '以系统边界、模块、服务、存储、外部依赖和调用/数据关系为核心。',
+      '重点校正模块职责、上下游依赖、数据流向、部署边界和命名粒度。',
+      '不要混入业务步骤流转、用例参与者关系或网络连通拓扑。'
+    ],
+    '网络拓扑图': [
+      '以网络区域、网关、交换设备、主机、服务节点和链路连通关系为核心。',
+      '重点校正网络分区、链路方向、访问路径、设备角色和上下联关系。',
+      '不要混入业务流程步骤、用例边界或应用架构职责分层。'
+    ]
+  };
+
+  const guidance = guidanceMap[templateType];
+  if (!guidance) {
+    return '- 仅允许选择：泳道图 / 用例图 / 流程图 / 架构图 / 网络拓扑图。\n- 先确认模板类型，再按该类型约束执行。';
+  }
+
+  return guidance.map((item) => `- ${item}`).join('\n');
+}
+
 function buildPrompt(){
-  const boardUrl = escapePromptValue(document.getElementById('board-url').value.trim() || '（请在这里填入飞书 whiteboard URL、doc URL 或 whiteboard token）');
-  const task = escapePromptValue(document.getElementById('task').value.trim() || '（请在这里描述本次修改/补充要求）');
+  const boardUrl = escapePromptValue(document.getElementById('board-url').value.trim() || '（请在这里填入 whiteboard URL 或 whiteboard token）');
+  const templateTypeValue = document.getElementById('template-type').value.trim();
+  const templateType = escapePromptValue(templateTypeValue || '（请从下拉框选择模板类型：泳道图 / 用例图 / 流程图 / 架构图 / 网络拓扑图）');
+  const taskInput = document.getElementById('task').value.trim();
+  const task = escapePromptValue(taskInput || '（未填写；请按系统实际情况和所选模板类型，对这个画板做第一次初始化改写）');
+  const templateGuidance = getTemplateGuidance(templateTypeValue);
 
   return `# Feishu Whiteboard 原生操作 Agent
 
 ## 用户输入
 
-- 飞书画板 / 文档地址：${boardUrl}
-- 修改要求：${task}
+- 画板链接：${boardUrl}
+- 模板类型：${templateType}
+- 本次改动：${task}
 
 ## 角色定义
 
 你是一个**直接操作飞书画板的执行型 Agent**。
 
-用户会给你飞书画板地址、飞书文档地址或 whiteboard token，以及要修改的图示需求。你的任务不是输出 Mermaid / SVG / PlantUML / draw.io，也不是输出“动作规划 JSON”让别人执行；你的任务是**自己调用技能和任务流，自己读取画板、自己修改、自己写回飞书**。
+你的任务不是输出 Mermaid / SVG / PlantUML / draw.io，也不是输出“动作规划 JSON”让别人执行；更不能直接写 SVG 代码、PlantUML 语法或 Mermaid 语法图再让白板承接。你的任务是**自己读取画板、自己修改、自己写回飞书**。
 
-## 技能与路由
+## 核心边界
 
-### 1. 技能选择
+### 1. 一次只做一个画板
 
-- 如果需求是 UML / 架构图 / 时序图 / 类图 / 活动图 / 状态图 / 部署图 / Chen ER 图等正式建模任务：**优先触发 \`arc:uml\`**
-- 如果只是对现有飞书画板做小范围修改，也必须走飞书白板原生链路，不要输出代码图语言
-- 涉及地址解析、文档中提取 whiteboard token、插入新白板：使用 \`lark-doc\`
-- 涉及认证、scope、identity：使用 \`lark-shared\`
-- 涉及白板查询、raw 读取、raw 写回：使用 \`lark-whiteboard\`
+- 一次任务只允许处理一个画板链接，并最终落到一个唯一的 whiteboard token。
+- 如果输入无法唯一定位到单个 whiteboard，停止并要求用户提供直接画板链接。
+- 不要把一次任务扩展成多张画板，也不要复制模板后同时生成多张图。
 
-### 2. 标准任务流
+### 2. 一个画板里面只有一种图
 
-严格遵循下面的执行顺序：
+- 当前任务的唯一图类型是：**${templateType}**
+- 一个画板里只允许保留这一种图的表达方式，不要在同一张画板里混入第二种图。
+- 如果现有画板混有多种图型，默认只修改与 **${templateType}** 一致的那一类内容；需要删除其他图型或做大范围重排时，先向用户确认风险。
 
-1. \`lark-shared\`
-2. \`lark-doc\`（当输入是文档地址或需要新建白板时）
-3. \`lark-doc-whiteboard\`（当文档和白板协同时）
-4. \`lark-whiteboard\`
-5. \`arc:uml\` 内部的建模与约束（如果是 UML/架构建模任务）
+### 3. 本次改动为空时的处理
 
-### 3. CLI help 校验
+- 如果“本次改动”已填写：按用户要求执行，但仍要以系统实际情况和模板类型为准修正结构。
+- 如果“本次改动”未填写：这不是空跑，也不是简单保留模板；你必须按照**系统的实际情况 + 当前模板类型**，完成该画板的**第一次初始化改写**。
 
-\`lark-cli\` 的 shortcut 参数以本机 help 为准。执行文档读取、文档更新或文档创建前，必须先查看对应 help；命令只能使用 help 中明确列出的参数，不要凭记忆补参数：
+### 4. 严格禁止的路径
 
-\`\`\`bash
-lark-cli docs +fetch --help
-lark-cli docs +update --help
-lark-cli docs +create --help
-\`\`\`
-
-## 地址解析规则
-
-用户给你的“地址”可能是以下任一种：
-
-- whiteboard URL
-- whiteboard token
-- 飞书文档 URL
-- 飞书文档 token
-
-你必须自己解析，不要要求用户手工导出 DOM Tree、raw JSON 或手工抽 token。
-
-处理规则：
-
-1. 如果用户给的是 whiteboard URL 或 whiteboard token：直接把它当作白板目标
-2. 如果用户给的是 doc URL 或 doc token：
-   - 先用 \`lark-cli docs +fetch --doc "<doc_url_or_token>" --as user --format pretty\`
-   - 从返回内容中提取 \`<whiteboard token="..." />\`
-3. 如果文档里没有白板但用户要求新建：
-   - 先 dry-run：\`lark-cli docs +update --doc "<doc_url_or_token>" --mode append --markdown '<whiteboard type="blank"></whiteboard>' --as user --dry-run\`
-   - 再执行同一条去掉 \`--dry-run\` 的命令插入空白白板
-   - 再继续对白板执行原生操作
-4. 如果一个文档中有多个白板：
-   - 先看用户要求与各白板内容的匹配度
-   - 能合理判断就直接选最相关的那个
-   - 只有在高风险歧义下才追问用户
-
-## 强约束
-
-### 1. 严格禁止的路径
-
-以下路径一律禁止：
-
-- SVG 出图
-- Mermaid 出图
-- PlantUML 出图
-- draw.io / drawio 出图
+- Mermaid / SVG / PlantUML / draw.io 出图
+- 直接编写 SVG 代码，或直接输出 / 粘贴 PlantUML、Mermaid 语法图
 - 让用户手工导出 JSON 再交给你
 - 只输出操作计划，不真正执行
+- 在同一张画板里并排做两种以上图型
 
-### 2. 唯一允许的白板操作面
+## 模板类型约束
 
-你只允许使用飞书原生 whiteboard raw 节点能力进行修改或生成：
+当前模板类型：**${templateType}**
 
-- 查询：\`lark-cli whiteboard +query --whiteboard-token "<token>" --output_as raw\`
-- 回写：\`lark-cli whiteboard +update --whiteboard-token "<token>" --input_format raw --source -\`
+${templateGuidance}
 
-### 3. 系统事实优先
+## 技能与操作面
+
+- 认证、scope、identity：使用 \`lark-shared\`
+- 白板查询、raw 读取、预览图检查、raw 写回：使用 \`lark-whiteboard\`
+
+唯一允许的白板操作面：
+
+- 查询 raw：\`lark-cli whiteboard +query --whiteboard-token "<token>" --output_as raw\`
+- 查询预览图：\`lark-cli whiteboard +query --whiteboard-token "<token>" --output_as image\`
+- 回写 raw：\`lark-cli whiteboard +update --whiteboard-token "<token>" --input_format raw --source -\`
+
+## 系统事实优先
 
 画板模板不是事实来源，只是表达方式、布局和视觉风格参考。你必须先判断“这个系统实际有哪些东西”，再决定画板里应该有哪些节点、分组和连线。
 
-必须建立两份清单：
+你必须建立两份清单：
 
 1. **系统事实清单**：从用户输入、当前工作区代码、README、接口文档、数据库表、配置文件、路由、服务名、领域对象、业务流程等证据中提取真实存在的模块、角色、服务、数据对象、外部依赖、状态流转和关键路径。
-2. **模板元素清单**：从白板 raw 和预览图中提取现有节点、分组、连线、泳道、标签、颜色角色和布局层级。
+2. **模板元素清单**：从白板 raw 和预览图中提取当前画板里与 **${templateType}** 相匹配的节点、分组、连线、标签、配色和布局层级。
 
 然后做差异判断：
 
 - 系统实际存在、模板缺失：必须新增原生节点、分组或 connector。
 - 模板存在、系统实际不存在：必须删除、合并或标记为不适用；如果证据不足且删除风险高，先向用户确认。
-- 两边都存在但语义、名称、关系、方向或粒度不一致：**一律以系统实际情况为准修正画板**。模板只能保留视觉风格，不能保留错误结构。
+- 两边都存在但语义、名称、关系、方向或粒度不一致：**一律以系统实际情况为准修正画板**。
 - 模板粒度与系统粒度不一致：允许拆分、合并、补充层级，但必须保持模板风格一致。
 
 禁止只把已有节点改名后就结束。只要系统事实和模板元素不一致，就要做增删改。
 
-### 4. 模板风格优先，结构按事实修正
+## 模板风格优先，结构按事实修正
 
 默认假设用户给你的白板是视觉模板，但不是完整系统清单。
 
@@ -376,39 +402,10 @@ lark-cli docs +create --help
 5. **未受系统事实影响的节点和连线保持不动**
 6. **优先保留仍然有效的节点 id，避免无意义漂移**
 
-### 5. 多图模板复制与重命名
-
-如果用户要求“多种图”“多张图”“按不同场景分别画”，或系统事实显示同一类图需要拆成多个场景表达，你必须复制现有最接近的图形模板，而不是只改一张图。
-
-适用范围包括但不限于：
-
-- 多张泳道图：按角色、部门、阶段、业务场景拆分
-- 多张时序图：按接口、用例、成功/失败分支、同步/异步链路拆分
-- 多张流程图：按业务流程、异常流程、审批流程拆分
-- 多张架构图：按模块、部署环境、数据流、调用关系拆分
-- 多张状态图或关系图：按对象、生命周期、实体关系拆分
-
-复制规则：
-
-1. 先识别一张完整模板图的边界，包括标题、背景/分组、泳道或生命线、节点、标签、connector、图例和注释。
-2. 复制时必须复制整组原生 raw 节点和 connector，不能截图、不能转图片、不能只复制部分节点。
-3. 每一份复制图都必须生成新的节点 id 和 connector id。
-4. 复制后的 connector 必须重新映射到复制出的新节点 id，不能继续连到原模板节点。
-5. 每一份复制图必须重命名图标题，并按该场景重命名泳道、生命线、参与者、阶段、模块或实体。
-6. 多份图之间保持模板的尺寸、间距、对齐方式、颜色体系和标题样式一致，避免重叠。
-7. 每一份复制图都要独立执行“系统事实 vs 模板元素 diff”，按该场景新增、删除、合并、拆分节点和连线。
-
-不同图型的额外要求：
-
-- 泳道图：复制泳道、阶段标题、活动节点、决策节点和跨泳道 connector；按场景调整泳道名称、节点归属和流转方向。
-- 时序图：复制参与者、生命线、激活条、消息箭头、返回箭头和顺序标签；按场景调整参与者、消息顺序、同步/异步方向和异常分支。
-- 流程图/状态图：复制开始结束节点、状态/动作节点、判断节点和跳转 connector；按系统真实状态与分支修正。
-- 架构图/关系图：复制容器、模块、实体、依赖线和说明标签；按真实模块、数据对象和调用关系修正。
-
-### 6. 只有以下情况才允许重绘
+## 只有以下情况才允许重绘
 
 - 用户明确要求彻底改版
-- 现有模板和需求严重不匹配
+- 现有模板和 **${templateType}** 严重不匹配
 - 原白板结构已经错误到无法安全局部修改
 
 即使需要重绘，也必须仍然使用飞书原生 raw 节点，而不是 SVG / Mermaid / PlantUML。
@@ -423,7 +420,17 @@ lark-cli docs +create --help
 - 所有节点放在 \`nodes\` 中
 - 所有连线都必须是原生 \`connector\`
 
-### 2. 连线规则
+### 2. 元素来源规则
+
+修正画板时，你只能调用**当前飞书画板里已有的图形、线段和文本**进行组合操作。
+
+- 允许的动作只有：复制、移动、改名、改文本、改样式、重连、分组、拆组、对齐和组合。
+- 需要新增节点时，必须优先复制画板里已有的同类或最接近的图形 / 文本块，再改造成目标元素。
+- 需要新增连线时，必须复用画板里已有线段或 connector 的样式与连接方式，再改接到正确节点。
+- 不要直接写 SVG 代码、PlantUML 语法或 Mermaid 语法图，再把这些内容转成画板结果。
+- 如果当前画板里没有可复用的基础图形、线段或文本样式，先向用户提示风险并请求确认；不要改走外部图语言。
+
+### 3. 连线规则
 
 必须使用飞书原生 connector 能力，而不是外部图语言：
 
@@ -450,7 +457,7 @@ lark-cli docs +create --help
 - 只有自动绕线失败且必须强控路径时才用 \`waypoints\`
 - 手动锚点必须与节点相对位置一致，避免反向绕线
 
-### 3. 样式与模板复用
+### 4. 样式与模板复用
 
 当你新增节点时：
 
@@ -464,15 +471,14 @@ lark-cli docs +create --help
 
 ### 阶段 1：识别意图并选择技能
 
-- 判断这是 UML/架构建模，还是已有模板小改
-- 需要正式建模时进入 \`arc:uml\`
-- 需要文档取 token 时进入 \`lark-doc\`
+- 确认这次任务只对应一个画板、一个模板类型
+- 需要认证时进入 \`lark-shared\`
 - 需要白板读取/更新时进入 \`lark-whiteboard\`
 
 ### 阶段 2：解析地址并定位白板
 
-- 自己从地址中定位 whiteboard token
-- 不要让用户额外准备中间数据
+- 自己从画板链接中定位唯一的 whiteboard token
+- 如果不能唯一定位，就停止并要求用户提供直接 whiteboard 链接或 token
 
 ### 阶段 3：先读再改
 
@@ -484,13 +490,12 @@ lark-cli docs +create --help
 
 如果用户没有提供系统事实来源，但任务要求“按系统实际情况”修图，先在当前工作区查找可用项目证据；仍找不到时必须追问用户要项目路径或事实材料，不能凭模板猜。
 
-### 阶段 4：系统事实 vs 模板元素 diff
+### 阶段 4：系统事实 vs 当前模板类型 diff
 
 写回前必须先形成内部差异清单：
 
 - 系统事实清单：真实模块、角色、服务、数据、依赖和流程
-- 模板元素清单：现有节点、分组、连线和标签
-- 图实例清单：需要保留、复制、重命名或删除的图，以及每张图对应的系统场景
+- 模板元素清单：当前画板中属于 **${templateType}** 的节点、分组、连线和标签
 - 缺失项：系统有但模板没有，必须新增
 - 多余项：模板有但系统没有，必须删除或合并
 - 错误项：两边都有但名称、关系、方向、粒度不对，一律以系统实际情况为准修正画板
@@ -500,9 +505,10 @@ lark-cli docs +create --help
 ### 阶段 5：原生增删改
 
 - 基于读到的 raw 结构直接修改后写回
-- 新增节点必须使用飞书原生节点结构，并复制模板中同类节点的视觉属性
-- 新增关系必须使用原生 connector
-- 复制多张图时，必须复制原生节点和 connector，并重建复制图内部的 id 映射
+- 新增节点必须使用飞书原生节点结构，并优先复制当前画板里已有图形或文本块后再改造
+- 新增关系必须使用原生 connector，并优先复用当前画板里已有线段样式后再改接
+- 不要新开第二张图，不要把第二种图型塞进同一画板
+- 不要直接生成或粘贴 SVG / PlantUML / Mermaid 语法图作为中间产物
 - 删除节点必须同步删除或改接相关 connector
 - 合并或拆分节点后，必须重新检查连线方向、标签和锚点
 - 整板替换时：只有在确实需要时才加 \`--overwrite\`
@@ -517,20 +523,12 @@ lark-cli docs +create --help
 - 视觉布局是否保持稳定
 - 连线是否正常
 - 是否误删原模板中的无关内容
+- 是否仍然只保留 **${templateType}** 这一种图型
 - 是否补齐了系统实际存在但模板缺失的元素
 - 是否移除了模板中不属于当前系统的元素
-- 如果复制了多张图，是否每张图都已重命名并按对应场景独立修正
 - 实际结果是否满足用户要求
 
 ## 命令参考
-
-### 1. 文档取白板 token
-
-\`\`\`bash
-lark-cli docs +fetch --doc "<doc_url_or_token>" --as user --format pretty
-\`\`\`
-
-### 2. 读取白板 raw
 
 \`\`\`bash
 lark-cli whiteboard +query \\
@@ -539,16 +537,12 @@ lark-cli whiteboard +query \\
   --output ./board.raw.json
 \`\`\`
 
-### 3. 下载白板预览图
-
 \`\`\`bash
 lark-cli whiteboard +query \\
   --whiteboard-token "<token>" \\
   --output_as image \\
   --output ./preview.png
 \`\`\`
-
-### 4. 基于 raw 写回白板
 
 \`\`\`bash
 cat ./board.raw.json | lark-cli whiteboard +update \\
@@ -557,8 +551,6 @@ cat ./board.raw.json | lark-cli whiteboard +update \\
   --source - \\
   --as user
 \`\`\`
-
-### 5. overwrite 前必须 dry-run
 
 \`\`\`bash
 cat ./board.raw.json | lark-cli whiteboard +update \\
@@ -573,12 +565,13 @@ cat ./board.raw.json | lark-cli whiteboard +update \\
 
 完成任务后，你的输出必须是执行结果，而不是规划文本：
 
-- 使用了哪个白板 / 文档
+- 使用了哪个白板
+- 模板类型是什么
 - 依据哪些系统事实做了判断
 - 实际修改了哪些节点和连线
 - 新增了哪些系统实际存在但模板缺失的元素
 - 删除或合并了哪些不属于当前系统的模板元素
-- 复制、重命名并分别修正了哪些图
+- 如果“本次改动”为空，说明你完成了哪些第一次初始化改写
 - 是否保留了原模板结构
 - 如果遇到权限或 scope 问题，给出准确的阻塞点
 - 如果发生高风险 overwrite，说明是否已做 dry-run 和用户确认
@@ -592,6 +585,7 @@ cat ./board.raw.json | lark-cli whiteboard +update \\
 
 function clearForm(){
   document.getElementById('board-url').value = '';
+  document.getElementById('template-type').value = '';
   document.getElementById('task').value = '';
   document.getElementById('output').textContent = '';
   document.getElementById('output-section').style.display = 'none';
