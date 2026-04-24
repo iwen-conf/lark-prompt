@@ -239,6 +239,7 @@
       <option value="泳道图">泳道图</option>
       <option value="用例图">用例图</option>
       <option value="流程图">流程图</option>
+      <option value="时序图">时序图</option>
       <option value="架构图">架构图</option>
       <option value="网络拓扑图">网络拓扑图</option>
     </select>
@@ -285,6 +286,11 @@ function getTemplateGuidance(templateType){
       '重点校正主流程、分支条件、回退路径、异常处理和前后顺序。',
       '不要混入泳道责任分区、用例边界或网络设备拓扑。'
     ],
+    '时序图': [
+      '以参与者、生命线、消息调用、返回和激活区间为核心，按时间先后自上而下展开。',
+      '重点校正调用顺序、同步/异步语义、返回路径、参与者边界和关键交互说明。',
+      '不要混入流程分支泳道、系统部署分层或网络链路拓扑。'
+    ],
     '架构图': [
       '以系统边界、模块、服务、存储、外部依赖和调用/数据关系为核心。',
       '重点校正模块职责、上下游依赖、数据流向、部署边界和命名粒度。',
@@ -299,7 +305,7 @@ function getTemplateGuidance(templateType){
 
   const guidance = guidanceMap[templateType];
   if (!guidance) {
-    return '- 仅允许选择：泳道图 / 用例图 / 流程图 / 架构图 / 网络拓扑图。\n- 先确认模板类型，再按该类型约束执行。';
+    return '- 仅允许选择：泳道图 / 用例图 / 流程图 / 时序图 / 架构图 / 网络拓扑图。\n- 先确认模板类型，再按该类型约束执行。';
   }
 
   return guidance.map((item) => `- ${item}`).join('\n');
@@ -308,7 +314,7 @@ function getTemplateGuidance(templateType){
 function buildPrompt(){
   const boardUrl = escapePromptValue(document.getElementById('board-url').value.trim() || '（请在这里填入 whiteboard URL 或 whiteboard token）');
   const templateTypeValue = document.getElementById('template-type').value.trim();
-  const templateType = escapePromptValue(templateTypeValue || '（请从下拉框选择模板类型：泳道图 / 用例图 / 流程图 / 架构图 / 网络拓扑图）');
+  const templateType = escapePromptValue(templateTypeValue || '（请从下拉框选择模板类型：泳道图 / 用例图 / 流程图 / 时序图 / 架构图 / 网络拓扑图）');
   const taskInput = document.getElementById('task').value.trim();
   const task = escapePromptValue(taskInput || '（未填写；请按系统实际情况和所选模板类型，对这个画板做第一次初始化改写）');
   const templateGuidance = getTemplateGuidance(templateTypeValue);
