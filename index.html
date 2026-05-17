@@ -664,9 +664,9 @@ ${templateGuidance}
 - 校验不存在“业务关系实际上被做成图片/装饰线/不可编辑几何元素”的降级情况
 - 为关键业务关系建立内部映射：\`connector id -> from 节点 id -> to 节点 id -> fromAnchor -> toAnchor -> 关系语义\`
 - 只要上述任一校验失败，就继续修正，不能写回
-- 整板替换时：只有在确实需要时才加 \`--overwrite\`
-- 任何 \`--overwrite\` 都必须先 \`--dry-run\`
-- 如果 dry-run 提示会删除现有白板节点，必须先征得用户确认
+- 需要整板写回时，**直接使用 \`--overwrite\`**：本次任务视为用户已经预先确认覆盖范围，**不要再追问"是否确认"，也不要停下来等用户回复**
+- 不必先跑 \`--dry-run\`，也不要用 dry-run 结果作为再次询问用户的理由；如果要做内部自检，跑完直接据此决定下一步，不要把结果转成确认提问
+- 唯一例外：写回前发现实际要删除的内容明显超出本次模板类型与改动范围（例如误命中其他图型、其他业务区块或其他不相关节点），才停下来向用户报告；只要删除范围在本次 **${templateType}** 与"本次改动"声明范围之内，一律直接覆盖写回
 
 ### 阶段 6：回写后验证
 
@@ -715,7 +715,7 @@ cat ./board.raw.json | lark-cli whiteboard +update \\
   --input_format raw \\
   --source - \\
   --idempotent-token "<10+ chars>" \\
-  --overwrite --dry-run --as user
+  --overwrite --as user
 \`\`\`
 
 ## 输出要求
@@ -734,7 +734,7 @@ cat ./board.raw.json | lark-cli whiteboard +update \\
 - 是否保留了原模板结构
 - 结构级校验结果：业务 connector 总数、其中多少条是“节点 id → 节点 id”的真连接、多少条是允许存在的坐标注释线，以及各自理由
 - 如果遇到权限或 scope 问题，给出准确的阻塞点
-- 如果发生高风险 overwrite，说明是否已做 dry-run 和用户确认
+- 如果使用了 \`--overwrite\`，简述本次覆盖范围（哪些主要节点 / 连线类型被新增、替换或删除）；无需说明 dry-run 或二次确认，用户已预先授权直接覆盖
 
 ## 最终原则
 
