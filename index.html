@@ -275,6 +275,7 @@
       <option value="类图">类图</option>
       <option value="流程图">流程图</option>
       <option value="时序图">时序图</option>
+      <option value="活动图">活动图</option>
       <option value="架构图">架构图</option>
       <option value="网络拓扑图">网络拓扑图</option>
     </select>
@@ -355,6 +356,17 @@ function getTemplateGuidance(templateType){
       '严禁：用一根点对点的折线/斜线代替"生命线 + 水平消息"的标准结构；用几何线条直接连接两个参与者头部而不画生命线；让消息箭头跨越或穿过中间生命线时改变 y 坐标。',
       '不要混入流程分支泳道、系统部署分层或网络链路拓扑。'
     ],
+    '活动图': [
+      '以开始节点、结束节点、动作、判断、合并、并行分叉/汇合和控制流箭头为核心，按执行顺序与并行结构自上而下展开。',
+      '重点校正起止节点唯一性、动作顺序、判断分支与 guard 条件、fork / join 成对匹配，以及（使用泳道时）跨分区的责任归属。',
+      '节点造型纪律：开始节点画成**小实心圆点**，结束节点画成**"实心圆 + 外圈"的环形终止节点**，动作节点统一使用**圆角矩形**且尺寸一致，判断 / 合并节点使用**菱形**，fork / join 使用**粗水平或垂直长条**；同类节点的尺寸、字号、内边距严格一致，不允许大小不一或样式漂移。',
+      '判断节点纪律：每个判断菱形必须**只有一条入边、两条以上出边**，所有出边都必须显式写出 guard 条件，统一使用 **[条件]** 方括号格式；同一判断节点的 guard 必须**互斥且覆盖所有可能分支**；多条分支汇合时必须走 merge 菱形（多条入边、一条出边），不允许把多条入边直接连进下一个动作。',
+      '并行结构纪律：fork 节点必须**只有一条入边、两条以上出边**，join 节点必须**两条以上入边、只有一条出边**；每一组 fork 必须有配对的 join，不允许只分叉不汇合；fork / join 不允许跨越判断结构错位嵌套，分叉出去的并行分支必须在同一个 join 处汇合。',
+      '主流向单一：默认自上而下，控制流箭头方向严格一致，y 坐标自前向后单调推进；显式回流必须写清 guard 条件并指向具体节点，不允许出现无标注的回环或自由折返。',
+      '泳道（可选）：如使用 partition / swimlane 表达执行者，泳道边界必须是整齐的矩形分区，列宽与列间距一致；每个动作节点必须**完全落在所属泳道内部**，不允许跨边界悬挂；跨泳道控制流箭头必须穿过泳道边界并明确指向目标泳道内的节点 id。',
+      '严禁：用一根点对点的折线 / 斜线代替"动作节点 + 控制流箭头"的标准结构；用几何线条贴在节点边缘冒充连接而不绑定节点 id；把 guard 条件或事件标签作为独立文本块漂浮在画布上而不挂在对应 connector 上；用普通矩形代替判断菱形或 fork / join 粗条。',
+      '不要混入时序图的生命线与消息箭头、用例图的 actor 与系统边界、类图的属性 / 方法或网络拓扑设备图例。'
+    ],
     '架构图': [
       '以系统边界、模块、服务、存储、外部依赖和调用/数据关系为核心。',
       '重点校正模块职责、上下游依赖、数据流向、部署边界和命名粒度。',
@@ -369,7 +381,7 @@ function getTemplateGuidance(templateType){
 
   const guidance = guidanceMap[templateType];
   if (!guidance) {
-    return '- 仅允许选择：泳道图 / 用例图 / 类图 / 流程图 / 时序图 / 架构图 / 网络拓扑图。\n- 先确认模板类型，再按该类型约束执行。';
+    return '- 仅允许选择：泳道图 / 用例图 / 类图 / 流程图 / 时序图 / 活动图 / 架构图 / 网络拓扑图。\n- 先确认模板类型，再按该类型约束执行。';
   }
 
   return guidance.map((item) => `- ${item}`).join('\n');
@@ -409,7 +421,7 @@ function getLanguageConfig(language){
 function buildPrompt(){
   const boardUrl = escapePromptValue(document.getElementById('board-url').value.trim() || '（请在这里填入 whiteboard URL 或 whiteboard token）');
   const templateTypeValue = document.getElementById('template-type').value.trim();
-  const templateType = escapePromptValue(templateTypeValue || '（请从下拉框选择模板类型：泳道图 / 用例图 / 类图 / 流程图 / 时序图 / 架构图 / 网络拓扑图）');
+  const templateType = escapePromptValue(templateTypeValue || '（请从下拉框选择模板类型：泳道图 / 用例图 / 类图 / 流程图 / 时序图 / 活动图 / 架构图 / 网络拓扑图）');
   const taskInput = document.getElementById('task').value.trim();
   const task = escapePromptValue(taskInput || '（未填写；请按系统实际情况和所选模板类型，对这个画板做第一次初始化改写）');
   const languageConfig = getLanguageConfig(getDiagramLanguage());
